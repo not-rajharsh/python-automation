@@ -1,0 +1,203 @@
+Learn:
+
+File watching(watchdog)
+Regular expressions
+Environment variables
+Configuration files
+Logging
+Exception handling
+
+pathlib
+time
+logging
+
+
+Here is a breakdown of the core concepts, most important functions, and practical usage for each module.
+
+---
+
+## 1. `pathlib` — Object-Oriented Filesystem Paths
+
+The modern replacement for `os.path`. It treats file paths as rich objects rather than raw strings, making cross-platform path manipulation much cleaner.
+
+### Key Concepts
+
+* **`Path`**: The primary class used to represent and interact with system paths. It automatically adapts to Windows or POSIX (Linux/Mac) file path rules.
+* **Path Composition (`/`)**: You can join path components using the `/` operator instead of `os.path.join()`.
+
+### Most Important Methods & Properties
+
+* **`Path.cwd()` / `Path.home()**`: Returns current working directory / user home directory.
+* **`Path.exists()` / `Path.is_file()` / `Path.is_dir()**`: True/False checks for existence and type.
+* **Path Parsing Properties**:
+* `.name`: File name with extension (e.g., `'report.txt'`)
+* `.stem`: File name without extension (e.g., `'report'`)
+* `.suffix`: File extension (e.g., `'.txt'`)
+* `.parent`: Parent directory path
+
+
+* **File Operations**:
+* `.read_text()` / `.write_text()`: Quickly read or write text without manual `open()` calls.
+* `.mkdir(parents=True, exist_ok=True)`: Creates directories (handles nested paths safely).
+* `.unlink(missing_ok=True)`: Removes a file.
+* `.rglob(pattern)`: Recursively searches directories matching a wildcard pattern (e.g., `'*.py'`).
+
+
+
+```python
+from pathlib import Path
+
+# Create path object
+log_dir = Path.cwd() / "logs"
+log_dir.mkdir(exist_ok=True)
+
+file_path = log_dir / "app.log"
+file_path.write_text("System initialized")
+
+print(f"File name: {file_path.name}, Extension: {file_path.suffix}")
+
+```
+
+---
+
+## 2. `time` — Low-Level Time and Clock Utilities
+
+Used for system clocks, performance measurement, and simple execution pauses. For handling calendars, dates, and timezones, prefer Python’s `datetime` module.
+
+### Key Concepts
+
+* **Unix Epoch Timestamp**: Seconds elapsed since January 1, 1970 UTC.
+* **Monotonic Clocks**: Clocks that only move forward, immune to system time changes (useful for timing operations accurately).
+
+### Most Important Functions
+
+* **`time.sleep(seconds)`**: Pauses thread execution for a given number of seconds.
+* **`time.perf_counter()`**: Returns high-resolution float time for measuring execution time/benchmarks.
+* **`time.time()`**: Returns current Unix timestamp as a float.
+* **`time.localtime([secs])` / `time.gmtime([secs])**`: Converts Epoch seconds to a struct_time object (Local time vs. UTC).
+* **`time.strftime(format, t)`**: Formats a `struct_time` object into a custom string.
+
+```python
+import time
+
+start_time = time.perf_counter()
+
+# Simulate work
+time.sleep(1.2)
+
+elapsed = time.perf_counter() - start_time
+print(f"Execution took {elapsed:.2f} seconds")
+
+```
+
+---
+
+## 3. `logging` — Flexible Event Logging
+
+Replaces basic `print()` statements for production software, allowing structured output categorized by severity level, output destinations (console, file), and formatting.
+
+### Key Concepts
+
+* **Log Levels (Lowest to Highest Severity)**:
+`DEBUG` (10) → `INFO` (20) → `WARNING` (30) → `ERROR` (40) → `CRITICAL` (50)
+* **Logger Hierarchy**: Loggers are organized in a dot-separated tree (`app.database`, `app.ui`).
+* **Handlers & Formatters**: **Handlers** send logs to destinations (files, stdout, email); **Formatters** determine log message layout.
+
+### Most Important Functions & Usage
+
+* **`logging.basicConfig()`**: Quick setup for root logger (sets output format, default level, output file).
+* **`logging.getLogger(name)`**: Instantiates or retrieves a logger instance (standard practice: `logging.getLogger(__name__)`).
+* **Level Methods**: `.debug()`, `.info()`, `.warning()`, `.error()`, `.critical()`.
+* **`logger.exception(msg)`**: Logs an `ERROR` level message and automatically attaches the current exception stack trace.
+
+```python
+import logging
+
+# Configure logger
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+logger = logging.getLogger(__name__)
+
+logger.info("Application starting...")
+
+try:
+    result = 10 / 0
+except ZeroDivisionError:
+    logger.exception("Calculation failed")
+
+```
+
+---
+
+## 4. `watchdog` — Filesystem Event Monitoring
+
+An external library (`pip install watchdog`) used to react to real-time filesystem changes (file creation, modification, deletion, movement).
+
+### Key Concepts
+
+* **`FileSystemEventHandler`**: Base class where you override event callback methods (e.g., `on_created`, `on_modified`).
+* **`Observer`**: A background thread that monitors specified directory paths and dispatches event notifications to the event handler.
+
+### Most Important Classes & Methods
+
+* **`watchdog.events.FileSystemEventHandler`**:
+* `on_created(event)`: Called when a file or directory is created.
+* `on_modified(event)`: Called when content/metadata changes.
+* `on_deleted(event)`: Called when deleted.
+* `on_moved(event)`: Called when renamed or moved.
+
+
+* **`watchdog.events.PatternMatchingEventHandler`**: A subclass of `FileSystemEventHandler` that lets you filter events by file patterns (e.g., `patterns=["*.txt"]`).
+* **`watchdog.observers.Observer`**:
+* `.schedule(event_handler, path, recursive=True/False)`: Registers path monitoring.
+* `.start()`: Starts monitoring thread.
+* `.stop()` / `.join()`: Cleanly halts the observer thread.
+
+
+
+### Event Object Properties
+
+Inside callback functions, `event` contains useful attributes:
+
+* `event.src_path`: Path of the modified file.
+* `event.is_directory`: Boolean indicating if the event was on a folder.
+
+```python
+import time
+from pathlib import Path
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+
+class FileWatcher(FileSystemEventHandler):
+    def on_modified(self, event):
+        if not event.is_directory:
+            print(f"File modified: {event.src_path}")
+
+    def on_created(self, event):
+        if not event.is_directory:
+            print(f"File created: {event.src_path}")
+
+# Setup folder monitoring
+target_dir = Path.cwd() / "watch_folder"
+target_dir.mkdir(exist_ok=True)
+
+event_handler = FileWatcher()
+observer = Observer()
+observer.schedule(event_handler, path=str(target_dir), recursive=False)
+
+observer.start()
+print(f"Monitoring folder: {target_dir}")
+
+try:
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    observer.stop()
+
+observer.join()
+
+```
+
