@@ -1,0 +1,12 @@
+import requests
+
+url = "https://jsonplaceholder.typicode.com/posts"
+headers = {"User-Agent": "MyPythonApp/1.0"}
+payload = {"title": "New Post", "body": "Content", "userId": 1}
+
+# POST request sending JSON payload
+response = requests.post(url, json=payload, headers=headers, timeout=5)
+
+if response.status_code == 201:
+    data = response.json()
+    print(f"Created post ID: {data['id']}")
